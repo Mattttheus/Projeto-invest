@@ -1,0 +1,2 @@
+# Dados financeiros pessoais: esta pasta nunca deve ser servida pelo Apache/WAMP.
+Require all denied

@@ -1,0 +1,23 @@
+{
+  "meta_mensal_por_ativo": 1000,
+  "aporte_mensal": 3000,
+  "peso_ideal_renda_variavel": 0.32,
+  "outras_classes": [
+    {
+      "classe": "Renda fixa",
+      "valor": 85000,
+      "peso_ideal": 0.5
+    },
+    {
+      "classe": "Internacional",
+      "valor": 22000,
+      "peso_ideal": 0.15
+    },
+    {
+      "classe": "Cripto",
+      "valor": 4000,
+      "peso_ideal": 0.03
+    }
+  ],
+  "arquivo_saida": "Gestao de investimentos.xlsx"
+}
