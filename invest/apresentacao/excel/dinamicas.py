@@ -6,7 +6,7 @@ As tabelas leem as tabelas do Excel (tCarteira, tProventos, tLancamentos) e se a
 """
 from openpyxl.styles import Alignment, Font
 
-from .estilo import MODO, AZUL, CINZA_TXT, F, TEXTO, faixa, larguras
+from .estilo import MODO, AZUL, CINZA_TXT, F, TEXTO, bgr, faixa, larguras
 
 XL_DATABASE, XL_ROW, XL_COLUMN, XL_PAGE, XL_SUM = 1, 1, 2, 3, -4157
 XL_TABULAR, XL_BAR_CLUSTERED = 1, 57
@@ -24,11 +24,6 @@ def aba_analises(wb):
         aviso.font = Font(name=F, size=9, italic=True, color=CINZA_TXT)
     larguras(ws, [18, 16, 16, 16, 16, 3, 18, 14, 14, 14, 3, 14, 14, 14, 14, 14])
     return ws
-
-
-def bgr(hexa):
-    """Cor 'RRGGBB' no formato inteiro BGR usado pela automação do Excel."""
-    return int(hexa[4:6] + hexa[2:4] + hexa[0:2], 16)
 
 
 def consultas(ws):

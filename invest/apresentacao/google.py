@@ -7,8 +7,8 @@ com links. A planilha no Drive passa a ser a base dos lançamentos feitos lá.
 import shutil
 from pathlib import Path
 
-from .caminhos import BASE
-from .excel import construir
+from ..config import BASE
+from .excel import VAGAS_GOOGLE, construir
 
 PASTA = BASE / "google"
 PLANILHA = "InvestERP - Google Planilhas.xlsx"
@@ -20,7 +20,8 @@ APPS_SCRIPT = r"""/**
  * InvestERP — Apps Script da planilha de investimentos (gerado por gestao.py).
  * Extensões › Apps Script › cole este código › salve › execute "configurar" uma vez e autorize.
  */
-const MENU = [["Painel", "Painel"], ["Carteira", "Carteira"], ["Análises", "Análises"], ["Cadastro", "✚ Lançar"],
+const MENU = [["Painel", "Painel"], ["Carteira", "Carteira"], ["Análises", "Análises"], ["Meta", "Meta"], ["Quant", "Quant"],
+              ["Modelos", "Modelos"], ["Projeção", "Projeção"], ["Cadastro", "✚ Lançar"],
               ["Lançamentos", "Lançamentos"], ["Proventos", "Proventos"], ["Premissas", "Premissas"],
               ["Verificar", "Verificar"]];
 const CAMPOS_LC = ["lc_data", "lc_ticker", "lc_op", "lc_qtd", "lc_preco", "lc_custos", "lc_tipo", "lc_seg"];
@@ -45,7 +46,7 @@ function configurar() {
   garantirCaixas();
 }
 
-/** Linha 1 de cada aba: menu com links para as outras abas (o módulo aberto fica em azul). */
+/** Linha 2 de cada aba: menu com links para as outras abas (o módulo aberto fica em negrito). */
 function montarNavegacao() {
   const ss = SpreadsheetApp.getActive();
   const gids = {};
@@ -53,8 +54,7 @@ function montarNavegacao() {
   const nomes = MENU.map(m => m[0]);
   ss.getSheets().forEach(sh => {
     if (nomes.indexOf(sh.getName()) < 0) return;
-    const marca = "◆ InvestERP        ";
-    let texto = marca;
+    let texto = "   ";
     const pos = [];
     MENU.forEach(([aba, rotulo]) => {
       if (!(aba in gids)) return;
@@ -62,14 +62,13 @@ function montarNavegacao() {
       texto += rotulo + "     ";
     });
     const b = SpreadsheetApp.newRichTextValue().setText(texto);
-    b.setTextStyle(0, marca.length, SpreadsheetApp.newTextStyle().setBold(true).setForegroundColor("#FFFFFF").setFontSize(11).build());
     pos.forEach(([aba, i, f]) => {
       const ativo = aba === sh.getName();
       b.setLinkUrl(i, f, "#gid=" + gids[aba]);
       b.setTextStyle(i, f, SpreadsheetApp.newTextStyle().setUnderline(false).setBold(ativo)
-        .setForegroundColor(ativo ? "#60A5FA" : "#CBD5E1").setFontSize(10).build());
+        .setForegroundColor(ativo ? "#14213D" : "#64748B").setFontSize(10).build());
     });
-    sh.getRange("B1").setRichTextValue(b.build());
+    sh.getRange("A2").setRichTextValue(b.build());
   });
 }
 
@@ -194,7 +193,7 @@ GUIA_TEXTO = """# InvestERP no Google Planilhas
 2. Apague o conteúdo do editor, cole todo o arquivo **{script}** e clique em **Salvar**.
 3. Escolha a função **configurar** e clique em **Executar** › autorize com sua conta Google.
 4. Volte para a planilha e recarregue a página: aparece o menu **InvestERP** e a barra de navegação
-   da linha 1 vira links.
+   da linha 2 vira links.
 
 ## 3. Uso
 - **✚ Lançar**: escolha o ticker, informe a quantidade e **marque a caixa ao lado de "Registrar"**
@@ -212,12 +211,11 @@ GUIA_TEXTO = """# InvestERP no Google Planilhas
 """
 
 
-def gerar(ativos, lanc, prov, cfg, avisos, drive: Path | None = None):
+def gerar(base, drive: Path | None = None):
     """Gera o pacote em google/ e, se drive for informado, copia para lá. Retorna mensagens."""
     PASTA.mkdir(exist_ok=True)
-    construir(ativos, lanc, prov, cfg, avisos, google=True).save(PASTA / PLANILHA)
+    construir(base, google=True).save(PASTA / PLANILHA)
     (PASTA / SCRIPT).write_text(APPS_SCRIPT.lstrip(), encoding="utf-8")
-    from .excel import VAGAS_GOOGLE
     (PASTA / GUIA).write_text(GUIA_TEXTO.format(planilha=PLANILHA, script=SCRIPT, vagas=VAGAS_GOOGLE), encoding="utf-8")
     msgs = [f"pacote Google em {PASTA}"]
     if drive:

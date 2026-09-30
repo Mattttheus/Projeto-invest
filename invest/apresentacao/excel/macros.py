@@ -2,12 +2,12 @@
 
 Botões:
   Cadastro  ✔ Registrar lançamento / Limpar      ✔ Registrar provento / Limpar
-  Painel    ✚ Novo lançamento                    ⟳ Atualizar cotações
+  Painel    ✚ Novo lançamento   ⟳ Atualizar   filtros Todos / Ações / FIIs e Limpar
 "Registrar" grava na base (dados/*.csv — fonte única) e na tabela da aba Lançamentos/Proventos,
 limpa o formulário e atualiza fórmulas e tabelas dinâmicas na hora.
 "Atualizar cotações" salva, fecha e roda gestao.py (busca cotações, gera de novo e reabre a planilha).
 """
-from .estilo import AZUL, CINZA_TXT, NAVY, F
+from .estilo import AZUL, CINZA_TXT, DOURADO, F, NAVY, TOPO, bgr
 
 VBA = r'''
 Option Explicit
@@ -199,6 +199,42 @@ Falha:
     Mensagem "pv_status", "Erro ao registrar: " & Err.Description, False
 End Sub
 
+Private Sub Filtrar(ByVal tipo As String)
+    ThisWorkbook.Names("FILTRO_TIPO").RefersToRange.Value = tipo
+    PintarFiltros
+End Sub
+
+Public Sub PintarFiltros()
+    ' botão do tipo selecionado em azul (como o mês escolhido no filtro), os demais em branco
+    Dim atual As String, par As Variant, shp As Shape
+    atual = CStr(ThisWorkbook.Names("FILTRO_TIPO").RefersToRange.Value)
+    On Error Resume Next
+    For Each par In Array(Array("flt_Todos", "Todos"), Array("flt_ACAO", "AÇÃO"), Array("flt_FII", "FII"))
+        Set shp = ThisWorkbook.Worksheets("Painel").Shapes(par(0))
+        If par(1) = atual Then
+            shp.Fill.ForeColor.RGB = RGB(46, 109, 180)
+            shp.Line.ForeColor.RGB = RGB(46, 109, 180)
+            shp.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
+        Else
+            shp.Fill.ForeColor.RGB = RGB(255, 255, 255)
+            shp.Line.ForeColor.RGB = RGB(203, 213, 225)
+            shp.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = RGB(51, 65, 85)
+        End If
+    Next par
+End Sub
+
+Public Sub FiltrarTodos()
+    Filtrar "Todos"
+End Sub
+
+Public Sub FiltrarAcoes()
+    Filtrar "AÇÃO"
+End Sub
+
+Public Sub FiltrarFIIs()
+    Filtrar "FII"
+End Sub
+
 Public Sub IrCadastro()
     ThisWorkbook.Worksheets("Cadastro").Activate
     Foco "lc_ticker"
@@ -217,11 +253,7 @@ End Sub
 '''
 
 
-def bgr(hexa):
-    return int(hexa[4:6] + hexa[2:4] + hexa[0:2], 16)
-
-
-def botao(ws, endereco, texto, macro, cor=AZUL, fonte="FFFFFF", borda=None):
+def botao(ws, endereco, texto, macro, cor=AZUL, fonte="FFFFFF", borda=None, tamanho=10):
     """Botão arredondado sobre um intervalo de células, ligado a uma macro."""
     rng = ws.Range(endereco)
     shp = ws.Shapes.AddShape(5, rng.Left + 2, rng.Top + 3, rng.Width - 4, rng.Height - 6)   # 5 = retângulo arredondado
@@ -238,7 +270,7 @@ def botao(ws, endereco, texto, macro, cor=AZUL, fonte="FFFFFF", borda=None):
         shp.Line.Visible = False
     tr = shp.TextFrame2.TextRange
     tr.Text = texto
-    tr.Font.Name, tr.Font.Size, tr.Font.Bold = F, 10, True
+    tr.Font.Name, tr.Font.Size, tr.Font.Bold = F, tamanho, True
     tr.Font.Fill.ForeColor.RGB = bgr(fonte)
     tr.ParagraphFormat.Alignment = 2                  # centralizado
     shp.TextFrame2.VerticalAnchor = 3                 # meio
@@ -264,7 +296,17 @@ def inserir(wb, linhas_botoes):
     botao(cad, f"E{rp}", "✔  Registrar provento", "RegistrarProvento", cor=NAVY)
     botao(cad, f"F{rp}", "Limpar", "LimparProvento", cor="FFFFFF", fonte=CINZA_TXT, borda="CBD5E1")
 
+    from .painel import BOTAO_ATUALIZAR, BOTAO_LIMPAR, BOTAO_NOVO, FILTROS
     painel = wb.Worksheets("Painel")
-    botao(painel, "X2:AA3", "✚  Novo lançamento", "IrCadastro", cor="F5C518", fonte="0B1F3A")
-    botao(painel, "AB2:AE3", "⟳  Atualizar cotações", "AtualizarTudo", cor="12294A", fonte="FFFFFF", borda="3B82F6")
-    return "macros e botões inseridos (Registrar, Limpar, Novo lançamento, Atualizar cotações)"
+    botao(painel, BOTAO_NOVO, "✚  Novo lançamento", "IrCadastro", cor=DOURADO, fonte=TOPO)
+    botao(painel, BOTAO_ATUALIZAR, "⟳  Atualizar", "AtualizarTudo", cor="FFFFFF", fonte=TOPO, borda="CBD5E1")
+    botao(painel, BOTAO_LIMPAR, "Limpar", "FiltrarTodos", cor="FFFFFF", fonte="2E6DB4", borda="CBD5E1", tamanho=8)
+    for tipo, (rng, macro) in FILTROS.items():
+        b = botao(painel, rng, {"AÇÃO": "Ações", "FII": "FIIs"}.get(tipo, tipo), macro, cor="FFFFFF", fonte="334155",
+                  borda="CBD5E1", tamanho=9)
+        b.Name = "flt_" + {"AÇÃO": "ACAO"}.get(tipo, tipo)
+    try:
+        wb.Application.Run(f"'{wb.Name}'!PintarFiltros")      # destaca o filtro atual (Todos)
+    except Exception:
+        pass
+    return "macros e botões inseridos (Registrar, Limpar, Novo lançamento, Atualizar, filtros do Painel)"

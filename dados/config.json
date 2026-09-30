@@ -1,5 +1,5 @@
 {
-  "meta_mensal_por_ativo": 1000,
+  "meta_mensal_por_ativo": 1099,
   "aporte_mensal": 3000,
   "peso_ideal_renda_variavel": 0.32,
   "outras_classes": [
@@ -19,5 +19,14 @@
       "peso_ideal": 0.03
     }
   ],
-  "arquivo_saida": "Gestao de investimentos.xlsm"
+  "arquivo_saida": "Gestao de investimentos.xlsm",
+  "analise": {
+    "cdi_anual": 0.14,
+    "horizonte_anos": 10,
+    "reinvestir_proventos": true,
+    "historico_anos": 5,
+    "inflacao_anual": 0.045,
+    "lambda_ewma": 0.94,
+    "simulacoes_monte_carlo": 5000
+  }
 }

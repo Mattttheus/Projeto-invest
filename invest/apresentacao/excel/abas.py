@@ -1,7 +1,7 @@
 """Abas de entrada (Ativos, Lançamentos, Proventos, Premissas) e de cálculo (Carteira, Verificar).
 
 Cada informação aparece uma única vez; as demais abas apenas apontam para ela.
-Layout comum: faixa de título nas linhas 1-2, cabeçalho na linha 4, dados a partir da linha 5.
+Layout comum (estilo.faixa): linha 1 = faixa com marca e título, 2 = menu, 3 = subtítulo; cabeçalho na 4, dados a partir da 5.
 """
 from openpyxl.comments import Comment
 from openpyxl.formatting.rule import CellIsRule, DataBarRule, FormulaRule
@@ -9,13 +9,15 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter as L
 from openpyxl.workbook.defined_name import DefinedName
 
-from .estilo import (MODO, AMBAR, BRL, BRL0, BRL4, DATE, F, MESES, PCT, QTD, TEAL, VERDE, VERMELHO,
+from ...dominio.avisos import AVISO, ERRO, INFO
+from .estilo import (MODO, AMBAR, CINZA_TXT, BRL, BRL0, BRL4, DATE, F, MESES, PCT, QTD, TEAL, VERDE, VERMELHO,
                      cabecalho, cel, f_bold, f_input, f_link, f_norm, f_sub, faixa, fill_head2,
                      fill_input, fill_total, fill_zebra, larguras, linha_total, notas, nulo, tabela)
 
 LIMITE = 5000         # última linha considerada em Lançamentos/Proventos
-H, D0 = 4, 5          # linha do cabeçalho e primeira linha de dados (linhas 1-3: barra superior)
+H, D0 = 4, 5          # linha do cabeçalho e primeira linha de dados (linhas 1-3: faixa, menu e subtítulo)
 ORIGEM = "Gerado a partir de dados/{} — edite lá e rode gestao.py (ou atualizar.bat)."
+COR_GRAVIDADE = {ERRO: VERMELHO, AVISO: AMBAR, INFO: CINZA_TXT}
 
 
 def _zebra(i):
@@ -212,9 +214,11 @@ def aba_verificar(wb, avisos):
         ws.cell(D0, 1, "Nenhuma inconsistência encontrada.").font = f_bold
     for k, (g, t, m) in enumerate(avisos):
         r = D0 + k
-        cel(ws, r, 1, g, None, Font(name=F, size=10, bold=True, color=VERMELHO if g == "ERRO" else AMBAR))
+        cel(ws, r, 1, g, None, Font(name=F, size=10, bold=True, color=COR_GRAVIDADE.get(g, CINZA_TXT)))
         cel(ws, r, 2, t, None, f_bold)
-        cel(ws, r, 3, m).alignment = Alignment(wrap_text=True, vertical="top")
+        for c in (1, 2):
+            ws.cell(r, c).alignment = Alignment(vertical="center", indent=1)
+        cel(ws, r, 3, m).alignment = Alignment(wrap_text=True, vertical="center")
         ws.row_dimensions[r].height = 30
     tabela(ws, "tVerificar", H, H + len(avisos), n)
     larguras(ws, [11, 24, 100])

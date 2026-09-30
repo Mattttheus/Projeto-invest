@@ -2,7 +2,8 @@
  * InvestERP — Apps Script da planilha de investimentos (gerado por gestao.py).
  * Extensões › Apps Script › cole este código › salve › execute "configurar" uma vez e autorize.
  */
-const MENU = [["Painel", "Painel"], ["Carteira", "Carteira"], ["Análises", "Análises"], ["Cadastro", "✚ Lançar"],
+const MENU = [["Painel", "Painel"], ["Carteira", "Carteira"], ["Análises", "Análises"], ["Meta", "Meta"], ["Quant", "Quant"],
+              ["Modelos", "Modelos"], ["Projeção", "Projeção"], ["Cadastro", "✚ Lançar"],
               ["Lançamentos", "Lançamentos"], ["Proventos", "Proventos"], ["Premissas", "Premissas"],
               ["Verificar", "Verificar"]];
 const CAMPOS_LC = ["lc_data", "lc_ticker", "lc_op", "lc_qtd", "lc_preco", "lc_custos", "lc_tipo", "lc_seg"];
@@ -27,7 +28,7 @@ function configurar() {
   garantirCaixas();
 }
 
-/** Linha 1 de cada aba: menu com links para as outras abas (o módulo aberto fica em azul). */
+/** Linha 2 de cada aba: menu com links para as outras abas (o módulo aberto fica em negrito). */
 function montarNavegacao() {
   const ss = SpreadsheetApp.getActive();
   const gids = {};
@@ -35,8 +36,7 @@ function montarNavegacao() {
   const nomes = MENU.map(m => m[0]);
   ss.getSheets().forEach(sh => {
     if (nomes.indexOf(sh.getName()) < 0) return;
-    const marca = "◆ InvestERP        ";
-    let texto = marca;
+    let texto = "   ";
     const pos = [];
     MENU.forEach(([aba, rotulo]) => {
       if (!(aba in gids)) return;
@@ -44,14 +44,13 @@ function montarNavegacao() {
       texto += rotulo + "     ";
     });
     const b = SpreadsheetApp.newRichTextValue().setText(texto);
-    b.setTextStyle(0, marca.length, SpreadsheetApp.newTextStyle().setBold(true).setForegroundColor("#FFFFFF").setFontSize(11).build());
     pos.forEach(([aba, i, f]) => {
       const ativo = aba === sh.getName();
       b.setLinkUrl(i, f, "#gid=" + gids[aba]);
       b.setTextStyle(i, f, SpreadsheetApp.newTextStyle().setUnderline(false).setBold(ativo)
-        .setForegroundColor(ativo ? "#60A5FA" : "#CBD5E1").setFontSize(10).build());
+        .setForegroundColor(ativo ? "#14213D" : "#64748B").setFontSize(10).build());
     });
-    sh.getRange("B1").setRichTextValue(b.build());
+    sh.getRange("A2").setRichTextValue(b.build());
   });
 }
 

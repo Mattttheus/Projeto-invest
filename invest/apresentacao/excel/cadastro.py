@@ -1,15 +1,14 @@
 """Aba Cadastro: formulário de lançamento (compra/venda de cotas) e de provento, com botões de registro.
 
 Com macros habilitadas, o botão "Registrar" grava na hora (aba Lançamentos/Proventos + dados/*.csv) e
-atualiza painel e tabelas dinâmicas — ver invest/excel/macros.py. Sem macros, o que ficar preenchido no
-formulário é importado por importar() ao rodar atualizar.bat.
+atualiza painel e tabelas dinâmicas — ver macros.py. Sem macros, o que ficar preenchido no formulário é
+lido por ler_formulario_preenchido() e importado por aplicacao/importacao.py ao rodar atualizar.bat.
 Os campos cinza vêm do cadastro do ativo (tipo, segmento, cotação atual, cotas que você tem);
 preço por cota vazio = cotação atual.
 """
-import datetime as dt
+import warnings
 from pathlib import Path
 
-import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -17,14 +16,12 @@ from openpyxl.utils import get_column_letter as L
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from .caminhos import DADOS
-from .excel.estilo import (MODO, AZUL, BORDA_HEX, BRL, BRL0, CINZA_TXT, DATE, F, FUNDO, NAVY, QTD, TEXTO, VERDE, VERMELHO,
+from ...dominio.carteira import OPERACOES, TIPOS_ATIVO, TIPOS_PROVENTO
+from .estilo import (MODO, AZUL, BORDA_HEX, BRL, BRL0, CINZA_TXT, DATE, F, FUNDO, NAVY, QTD, TEXTO, VERDE, VERMELHO,
                            faixa, fill_input)
 
 ABA = "Cadastro"
 MARCA, MARCA_CEL = "cadastro-formulario-v3", (3, 12)
-TIPOS_ATIVO, OPERACOES = ("AÇÃO", "FII"), ("COMPRA", "VENDA")
-TIPOS_PROVENTO = ("DIVIDENDO", "JCP", "RENDIMENTO", "AMORTIZAÇÃO")
 BRANCO = PatternFill("solid", fgColor="FFFFFF")
 CINZA = PatternFill("solid", fgColor="F1F5F9")
 BORDA = Side(style="thin", color=BORDA_HEX)
@@ -58,8 +55,6 @@ PROVENTO = [("pv_data", "Data pagamento  (vazio = hoje)", DATE, "entrada"),
             (None, "AUTOMÁTICO  ⟲", None, "secao"),
             ("pv_tem", "Cotas que você tem", QTD, "auto"),
             ("pv_total", "Total recebido", BRL, "auto")]
-ENTRADAS_LC = [n for n, _, _, t in LANCAMENTO if t == "entrada"]
-ENTRADAS_PV = [n for n, _, _, t in PROVENTO if t == "entrada"]
 PAINEL = [("Data", DATE, "A", 11), ("Ticker", None, "B", 10), ("Operação", None, "C", 10),   # últimos lançamentos
           ("Cotas", QTD, "D", 9), ("Preço (R$)", BRL, "E", 12)]
 
@@ -233,7 +228,7 @@ def ultimos(ws, n=15):
     nota.font = Font(name=F, size=8, italic=True, color=CINZA_TXT)
 
 
-# ------------------------------------------------------------------ importação (sem macros / layouts antigos)
+# ------------------------------------------------------------------ leitura do que ficou preenchido (sem macros / layouts antigos)
 
 NOTA_ANTIGA = "Ticker novo?"                              # rodapé do formulário antigo — não é lançamento
 
@@ -242,28 +237,6 @@ def _limpo(v):
     if v in (None, "") or (isinstance(v, str) and (v.startswith("=") or v.startswith(NOTA_ANTIGA))):
         return None
     return v
-
-
-def _data(v):
-    if v in (None, ""):
-        return dt.date.today()
-    if isinstance(v, dt.datetime):
-        return v.date()
-    if isinstance(v, dt.date):
-        return v
-    return dt.datetime.strptime(str(v).strip(), "%d/%m/%Y").date()
-
-
-def _num(v):
-    if v in (None, ""):
-        return None
-    if isinstance(v, (int, float)):
-        return float(v)
-    return float(str(v).replace("R$", "").replace(".", "").replace(",", ".").strip())
-
-
-def _txt(v):
-    return str(v).strip().upper() if v not in (None, "") else ""
 
 
 LANC_MAPA = {"Data": "lc_data", "Ticker": "lc_ticker", "Operação": "lc_op", "Quantidade de cotas": "lc_qtd",
@@ -318,125 +291,28 @@ def _ler_tabela_antiga(ws):
             bloco(12, 7, {}))
 
 
-def _salvar(nome, linhas):
-    arq = DADOS / nome
-    texto = arq.read_text(encoding="utf-8-sig")
-    if texto and not texto.endswith("\n"):
-        texto += "\n"
-    texto += "".join(";".join(l) + "\n" for l in linhas)
-    arq.write_text(texto, encoding="utf-8-sig")
-
-
-def _br(x, casas=2):
-    return f"{x:.{casas}f}".replace(".", ",")
-
-
-def _qtd(x):
-    return _br(x, 0) if float(x).is_integer() else _br(x, 6)
-
-
-def _cotacao(tk, ativos):
-    """Valor unitário já estabelecido no cadastro do ativo; ticker novo sem cotação é buscado no Yahoo."""
-    linha = ativos[ativos["ticker"].str.upper() == tk]
-    if len(linha):
-        v = _num(linha.iloc[0]["preco"])
-        if v and v > 0:
-            return v
-    try:
-        from .mercado import buscar
-        return buscar(tk)[0]
-    except Exception:
-        return None
-
-
-def importar(planilha: Path):
-    """Importa o que ficou preenchido no Cadastro da planilha salva. Retorna (resumo, pendentes)."""
-    vazio = {"compras": [], "proventos": []}
+def ler_formulario_preenchido(planilha: Path):
+    """Campos preenchidos no Cadastro de uma planilha salva (layout atual ou anteriores).
+    Retorna (compras, proventos, mensagem); mensagem != None quando não há o que ler."""
     if not planilha.exists():
-        return "nenhuma planilha anterior", vazio
-    wb = load_workbook(planilha, data_only=False)
+        return [], [], "nenhuma planilha anterior"
+    with warnings.catch_warnings():               # segmentação/validação estendida: irrelevantes para a leitura
+        warnings.simplefilter("ignore", UserWarning)
+        wb = load_workbook(planilha, data_only=False)
     if ABA not in wb.sheetnames:
-        return "planilha anterior sem aba Cadastro", vazio
+        return [], [], "planilha anterior sem aba Cadastro"
     ws = wb[ABA]
     marcas = {ws.cell(3, c).value for c in (12, 13, 14)}
     if MARCA in marcas:
-        compras, proventos = _ler_formulario(ws)
-    elif "cadastro-cartoes-v2" in marcas:
-        compras, proventos = _ler_cartoes_v2(ws)
-    elif ws.cell(8, 1).value == "Data":
-        compras, proventos = _ler_tabela_antiga(ws)
-    else:
-        return "layout do Cadastro não reconhecido — nada importado", vazio
+        return (*_ler_formulario(ws), None)
+    if "cadastro-cartoes-v2" in marcas:
+        return (*_ler_cartoes_v2(ws), None)
+    if ws.cell(8, 1).value == "Data":
+        return (*_ler_tabela_antiga(ws), None)
+    return [], [], "layout do Cadastro não reconhecido — nada importado"
 
-    ativos = pd.read_csv(DADOS / "ativos.csv", sep=";", encoding="utf-8-sig", dtype=str)
-    lanc = pd.read_csv(DADOS / "lancamentos.csv", sep=";", encoding="utf-8-sig", dtype=str)
-    conhecidos = set(ativos["ticker"].str.upper())
-    cotas = {}
-    for _, l in lanc.iterrows():
-        sinal = -1 if _txt(l["operacao"]) == "VENDA" else 1
-        cotas[_txt(l["ticker"])] = cotas.get(_txt(l["ticker"]), 0) + sinal * (_num(l["quantidade"]) or 0)
-    novos, compras_ok, prov_ok = {}, [], []
-    pend = {"compras": [], "proventos": []}
 
-    for d in compras:
-        try:
-            tk = _txt(d.get("Ticker"))
-            op = _txt(d.get("Operação")) or "COMPRA"
-            qtd, custos = _num(d.get("Quantidade de cotas")), _num(d.get("Custos (R$)")) or 0
-            if not tk:
-                raise ValueError("informe o ticker")
-            if op not in OPERACOES:
-                raise ValueError("operação deve ser COMPRA ou VENDA")
-            if not qtd or qtd <= 0:
-                raise ValueError("informe a quantidade de cotas")
-            if tk not in conhecidos and tk not in novos:
-                tipo = _txt(d.get("Tipo do ativo"))
-                if tipo not in TIPOS_ATIVO:
-                    raise ValueError("ticker novo: informe o Tipo do ativo (AÇÃO ou FII)")
-                novos[tk] = (tipo, str(d.get("Segmento") or "").strip())
-            preco = _num(d.get("Preço por cota (R$)")) or _cotacao(tk, ativos)
-            if not preco or preco <= 0:
-                raise ValueError("sem cotação para este ticker — informe o preço por cota")
-            if op == "VENDA" and qtd > cotas.get(tk, 0):
-                raise ValueError(f"venda maior que as cotas que você tem ({cotas.get(tk, 0):g})")
-            cotas[tk] = cotas.get(tk, 0) + (-qtd if op == "VENDA" else qtd)
-            compras_ok.append([_data(d.get("Data")).strftime("%d/%m/%Y"), tk, op, _qtd(qtd), _br(preco), _br(custos)])
-        except Exception as e:
-            d["Observação"] = f"Não importado: {e}"
-            pend["compras"].append(d)
-
-    for d in proventos:
-        try:
-            tk = _txt(d.get("Ticker"))
-            tipo = _txt(d.get("Tipo de provento")) or "DIVIDENDO"
-            valor = _num(d.get("Valor por cota (R$)"))
-            qtd = _num(d.get("Qtd de cotas")) or cotas.get(tk, 0)
-            if not tk or (tk not in conhecidos and tk not in novos):
-                raise ValueError("ticker não cadastrado — registre a compra primeiro")
-            if tipo not in TIPOS_PROVENTO:
-                raise ValueError("tipo de provento inválido")
-            if not valor or valor <= 0:
-                raise ValueError("informe o valor por cota")
-            if not qtd or qtd <= 0:
-                raise ValueError("você não tem cotas deste ativo — informe a quantidade")
-            prov_ok.append([_data(d.get("Data pagamento")).strftime("%d/%m/%Y"), tk, tipo, _br(valor, 4), _qtd(qtd)])
-        except Exception as e:
-            d["Observação"] = f"Não importado: {e}"
-            pend["proventos"].append(d)
-
-    if novos:
-        _salvar("ativos.csv", [[tk, tipo, seg or "-", "0", "0", "0", "manual"] for tk, (tipo, seg) in novos.items()])
-    if compras_ok:
-        _salvar("lancamentos.csv", compras_ok)
-    if prov_ok:
-        _salvar("proventos.csv", prov_ok)
-    # o formulário tem uma vaga de cada tipo: a primeira pendência volta para ele, as demais aparecem no resumo
-    pend_form = {"compras": [{LANC_MAPA[k]: v for k, v in d.items() if k in LANC_MAPA} for d in pend["compras"][:1]],
-                 "proventos": [{PROV_MAPA[k]: v for k, v in d.items() if k in PROV_MAPA} for d in pend["proventos"][:1]]}
-    partes = [f"{len(compras_ok)} lançamento(s)", f"{len(prov_ok)} provento(s)"]
-    if novos:
-        partes.append("ticker(s) novo(s): " + ", ".join(novos))
-    erros = pend["compras"] + pend["proventos"]
-    if erros:
-        partes.append(f"{len(erros)} com erro: " + " | ".join(f"{d.get('Ticker') or '?'} — {d['Observação']}" for d in erros))
-    return "importado: " + " • ".join(partes), pend_form
+def para_formulario(compras, proventos):
+    """Pendências (com 'Observação') no formato dos campos do formulário: uma vaga de cada tipo."""
+    return {"compras": [{LANC_MAPA[k]: v for k, v in d.items() if k in LANC_MAPA} for d in compras[:1]],
+            "proventos": [{PROV_MAPA[k]: v for k, v in d.items() if k in PROV_MAPA} for d in proventos[:1]]}

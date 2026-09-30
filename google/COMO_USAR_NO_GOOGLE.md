@@ -11,7 +11,7 @@
 2. Apague o conteúdo do editor, cole todo o arquivo **InvestERP.gs** e clique em **Salvar**.
 3. Escolha a função **configurar** e clique em **Executar** › autorize com sua conta Google.
 4. Volte para a planilha e recarregue a página: aparece o menu **InvestERP** e a barra de navegação
-   da linha 1 vira links.
+   da linha 2 vira links.
 
 ## 3. Uso
 - **✚ Lançar**: escolha o ticker, informe a quantidade e **marque a caixa ao lado de "Registrar"**

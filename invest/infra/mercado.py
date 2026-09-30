@@ -1,28 +1,14 @@
 """Atualiza cotação e proventos dos últimos 12 meses em dados/ativos.csv (fonte: Yahoo Finance).
 
 Grava direto nas colunas preco, provento_anual_cota e atualizado_em — não cria cópia dos dados.
-Se um ticker falhar, o valor anterior é mantido. Só os tickers são enviados ao Yahoo.
-Para ações, o Yahoo informa JCP pelo valor bruto (antes dos 15% de IR).
+Se um ticker falhar, o valor anterior é mantido.
 """
 import pandas as pd
 
-from .caminhos import DADOS
+from ..config import DADOS
+from .yahoo import cotacao_e_proventos_12m
 
 ARQ = DADOS / "ativos.csv"
-
-
-def buscar(ticker):
-    import yfinance as yf
-
-    k = yf.Ticker(f"{ticker}.SA")
-    fech = k.history(period="1mo")["Close"].dropna()
-    if fech.empty:
-        raise ValueError("sem cotação")
-    div = k.dividends
-    if len(div):
-        inicio = pd.Timestamp.now(tz=div.index.tz) - pd.DateOffset(years=1)
-        div = div[div.index >= inicio]
-    return round(float(fech.iloc[-1]), 2), round(float(div.sum()), 4), fech.index[-1].date()
 
 
 def atualizar():
@@ -34,7 +20,7 @@ def atualizar():
     ok = 0
     for i, t in df["ticker"].items():
         try:
-            preco, prov, dia = buscar(t.strip().upper())
+            preco, prov, dia = cotacao_e_proventos_12m(t.strip().upper())
         except Exception as e:  # rede fora, ticker inexistente etc.
             print(f"  {t:7} mantido (falha: {e})")
             continue

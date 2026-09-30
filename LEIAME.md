@@ -8,17 +8,33 @@ dados/          ENTRADA — única fonte (edite só aqui)
   ativos.csv        cadastro: ticker, tipo, segmento, peso ideal (cotação e proventos 12m são automáticos)
   lancamentos.csv   compras e vendas
   proventos.csv     dividendos, JCP e rendimentos recebidos
-  config.json       meta mensal por ativo, aporte mensal, peso da renda variável, outras classes
+  config.json       meta mensal por ativo, aporte mensal, peso da renda variável, outras classes, analise
+  historico.csv     AUTOMÁTICO: cotações e proventos semanais de 5 anos + Ibovespa (base da análise quantitativa)
 saida/          planilha gerada (Gestao de investimentos.xlsm, com macros)
 google/         versão Google Planilhas (planilha + InvestERP.gs + passo a passo)
-invest/         código
-  dados.py          leitura e checagens
-  mercado.py        cotações e proventos (Yahoo Finance)
-  excel/            abas, painel, tabelas dinâmicas, macros (VBA) e estilo da planilha
-  cadastro.py       formulário de lançamentos e importação
-  google.py         versão Google Planilhas (GOOGLEFINANCE, QUERY, Apps Script)
+invest/         código em camadas (Clean Architecture: cada camada só depende das de dentro)
+  config.py         caminhos e leitura de dados/config.json
+  dominio/          regras puras — sem arquivos, internet ou Excel (testáveis isoladamente)
+    carteira.py       posições, fluxos de caixa, TIR
+    lancamentos.py    regras para aceitar compra/venda/provento digitados no Cadastro
+    validacao.py      conferência da base (vira a aba Verificar)
+    analise.py        risco/retorno, qualidade dos dados, regressão, carteira real, parâmetros da projeção
+    modelos.py        derivadas polinomiais, EWMA (λ), estatística, CAPM, Fisher, autovalores, Markowitz, Monte Carlo
+    avisos.py, base.py  tipos compartilhados (Aviso, BaseDados)
+  infra/            mundo externo
+    repositorio.py    leitura tipada e gravação dos CSV de dados/
+    yahoo.py          único ponto que acessa a internet (Yahoo Finance)
+    mercado.py        atualiza cotação e proventos 12m em ativos.csv
+    historico.py      histórico semanal em dados/historico.csv
+  aplicacao/        casos de uso
+    importacao.py     importar o que ficou preenchido no Cadastro (uso sem macros)
+    pipeline.py       atualizar o mercado; conferir e analisar a base
+  apresentacao/     saídas
+    excel/            abas, painel, formulário do Cadastro, análises, tabelas dinâmicas, macros (VBA), estilo
+    google.py         versão Google Planilhas (GOOGLEFINANCE, QUERY, Apps Script)
+tests/          testes automáticos (python -m unittest discover -s tests -t .)
 arquivo/        planilha antiga e dados simulados antigos (backup)
-gestao.py       comando único
+gestao.py       comando único (raiz de composição: único arquivo que liga as camadas)
 atualizar.bat   duplo clique = atualizar tudo
 ```
 
@@ -40,17 +56,46 @@ Renda fixa, internacional e cripto (ex.: CDB Nubank) ficam em `dados/config.json
 - Sem internet: `python gestao.py --offline`.
 - Tabelas dinâmicas precisam do Excel instalado (Windows); sem ele use `--sem-dinamicas`.
 - Feche a planilha no Excel antes de atualizar.
+- Testes automáticos (não usam internet nem seus dados): `python -m unittest discover -s tests -t .`
 
 ## Planilha
-Menu no topo: Painel · Carteira · Análises · ✚ Lançar · Lançamentos · Proventos · Premissas · Verificar.
+Menu no topo: Painel · Carteira · Análises · Meta · Quant · Modelos · Projeção · ✚ Lançar · Lançamentos · Proventos · Premissas · Verificar.
 - **Carteira** é a lista única de ações/FIIs: posição, proventos, peso e meta de renda na mesma linha
   (ativos que você ainda não tem aparecem em cinza). A aba Ativos fica oculta, só como base.
-- **Painel (tela inicial estilo sistema ERP):** menu lateral com todos os módulos, indicadores da carteira e da meta de renda, 8 gráficos (posição, lucro, ações x FIIs, renda x meta, aporte necessário, proventos por mês, proventos por ativo, peso atual x ideal) e alocação por classe. Botões no topo levam às demais abas; cada aba tem "◀ Painel" para voltar.
+- **Painel (padrão Casa Organizada, tema claro):** faixa azul-marinho com a situação dos dados e o botão **✚ Novo lançamento**; menu de abas com a aba aberta sublinhada; painel **Filtros** à esquerda (Todos / Ações / FIIs, atalhos e progresso da meta); cards de indicadores; 6 gráficos (proventos por mês, posição por tipo e por ativo, patrimônio por classe, progresso da meta, proventos por ativo); meta de renda, destaques e alocação por classe.
 - Azul em fundo amarelo = entrada (vem de `dados/`); verde = vínculo com outra aba; preto = fórmula.
 - Todas as tabelas têm filtro no cabeçalho (ex.: filtrar só FIIs).
 - **Análises:** tabelas dinâmicas (carteira por tipo, proventos por ativo, lançamentos) e gráfico dinâmico com segmentação por Tipo; atualizam ao abrir o arquivo.
 - Paleta executiva: azul = dado principal, cinza = referência; verde/vermelho só para ganho/perda.
-- A aba **Verificar** lista inconsistências encontradas nos dados.
+- A aba **Verificar** lista inconsistências encontradas nos dados — inclusive as da análise quantitativa
+  (cotações espúrias do Yahoo corrigidas, provento do cadastro diferente do histórico, queda forte de proventos,
+  tendência sem confiabilidade estatística, ativo que concentra o risco).
+
+## Meta de renda por ativo (aba Meta)
+Cada ação e cada FII deve pagar a meta mensal (`meta_mensal_por_ativo` em `dados/config.json`, hoje R$ 1.099).
+Por ativo: provento mensal por cota, **cotas necessárias** (meta ÷ provento mensal por cota), **custo total da meta**
+(cotas × cotação), cotas que você tem, renda atual, % da meta, **cotas faltantes**, **custo faltante** e meses com
+o aporte mensal. Total da carteira e subtotais de ações e de FIIs. Tudo por fórmula: muda sozinho com as cotações.
+
+## Análise quantitativa (abas Quant, Modelos e Projeção)
+Calculada a cada execução a partir de `dados/historico.csv` e dos seus lançamentos. Os pesos usados são os da
+**carteira real** (lançamentos × cotação); sem lançamentos, os pesos ideais.
+- **Quant** (uma linha por ativo, mesma ordem da Carteira): qualidade dos dados, retorno 12m, volatilidade
+  (histórica e EWMA λ), Sharpe, Sortino, queda máxima, VaR/CVaR 95%, beta e correlação com o Ibovespa,
+  CAPM e alfa de Jensen, assimetria, curtose, teste de normalidade Jarque-Bera, autocorrelação,
+  **derivadas analíticas** de um polinômio de grau 3 ajustado ao log-preço (taxa instantânea f′ e curvatura f″),
+  regressão log-linear de 3 anos com R² e faixa de preço 12m, crescimento dos proventos e contribuição ao risco.
+  Abaixo: resumo da carteira (volatilidade com correlações, diversificação, beta, DY, TIR dos seus lançamentos)
+  e matriz de correlação.
+- **Modelos**: retorno real (equação de Fisher), autovalores/autovetores da matriz de covariância (fatores de
+  risco), carteiras de Markowitz (mínima variância e máximo Sharpe, sem venda a descoberto) comparadas com os
+  pesos ideais e a carteira real, e Monte Carlo (movimento browniano geométrico) com percentis por ano,
+  probabilidade de vencer o CDI e de atingir a meta de renda.
+- **Projeção**: evolução mês a mês com fórmulas (parte da Carteira e do aporte das Premissas) em 3 cenários +
+  CDI; os parâmetros em amarelo podem ser alterados na própria aba.
+- Parâmetros em `dados/config.json` → `analise`: `cdi_anual`, `inflacao_anual`, `horizonte_anos`,
+  `reinvestir_proventos`, `historico_anos`, `lambda_ewma`, `simulacoes_monte_carlo`.
+- Estimativas estatísticas a partir do passado — não são recomendação nem garantia de retorno.
 
 ## Privacidade
 - `.htaccess` impede o Apache/WAMP de servir esta pasta (ela fica dentro de `www`).
