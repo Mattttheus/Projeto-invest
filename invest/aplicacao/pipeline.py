@@ -1,4 +1,5 @@
 """Casos de uso encadeados pelo comando gestao.py: atualizar o mercado e conferir/analisar a base."""
+from ..dominio import metas as regras_metas
 from ..dominio.analise import analisar
 from ..dominio.base import BaseDados
 from ..dominio.validacao import validar
@@ -15,6 +16,8 @@ def atualizar_mercado(cfg):
 def conferir_e_analisar(hoje=None):
     """Carrega dados/, valida e roda a análise quantitativa. Os avisos da análise entram na conferência."""
     ativos, lanc, prov, cfg = repositorio.carregar()
-    avisos = validar(ativos, lanc, prov)
-    resultado = analisar(ativos, lanc, prov, cfg, historico.carregar(), hoje)
-    return BaseDados(ativos, lanc, prov, cfg, avisos + resultado["avisos"], resultado)
+    personalizadas = repositorio.carregar_metas()
+    metas = regras_metas.resolver(ativos, personalizadas, cfg)
+    avisos = validar(ativos, lanc, prov) + regras_metas.validar(personalizadas, ativos)
+    resultado = analisar(ativos, lanc, prov, cfg, historico.carregar(), hoje, metas)
+    return BaseDados(ativos, lanc, prov, cfg, avisos + resultado["avisos"], resultado, metas)

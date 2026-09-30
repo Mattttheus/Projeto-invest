@@ -6,11 +6,12 @@ import pandas as pd
 
 from ..config import DADOS, ler_config
 
-ATIVOS, LANCAMENTOS, PROVENTOS = "ativos.csv", "lancamentos.csv", "proventos.csv"
+ATIVOS, LANCAMENTOS, PROVENTOS, METAS = "ativos.csv", "lancamentos.csv", "proventos.csv", "metas.csv"
 FORMATO_DATA = "%d/%m/%Y"
 NUMERICAS = {ATIVOS: ("preco", "provento_anual_cota", "peso_ideal"),
              LANCAMENTOS: ("quantidade", "preco", "custos"),
-             PROVENTOS: ("valor_cota", "quantidade")}
+             PROVENTOS: ("valor_cota", "quantidade"),
+             METAS: ("meta_mensal", "prazo_meses")}
 
 
 def ler_csv(nome, datas=()):
@@ -39,6 +40,24 @@ def carregar():
     lanc["custos"] = lanc["custos"].fillna(0)
     prov = _maiusculas(ler_csv(PROVENTOS, datas=["data"]), "ticker", "tipo")
     return ativos, lanc, prov, ler_config()
+
+
+def carregar_metas():
+    """Metas personalizadas por ativo (opcional: sem o arquivo, todos usam o padrão do config.json)."""
+    from ..dominio.metas import vazias
+    if not (DADOS / METAS).exists():
+        return vazias()
+    return _maiusculas(ler_csv(METAS), "ticker")
+
+
+def salvar_metas(metas):
+    """Reescreve metas.csv só com os ativos personalizados (campo vazio = padrão)."""
+    linhas = ["ticker;meta_mensal;prazo_meses"]
+    for m in metas:
+        meta = "" if m["meta_mensal"] is None else br(m["meta_mensal"])
+        prazo = "" if m["prazo_meses"] is None else str(m["prazo_meses"])
+        linhas.append(f"{m['ticker']};{meta};{prazo}")
+    (DADOS / METAS).write_text("\n".join(linhas) + "\n", encoding="utf-8-sig")
 
 
 def tickers_cadastrados():

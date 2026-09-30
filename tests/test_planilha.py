@@ -38,11 +38,18 @@ class TestPlanilha(unittest.TestCase):
         self.assertIsNotNone(c["tir"])
         self.assertAlmostEqual(base().analise["por_ativo"]["contrib_risco"].sum(), 1.0, places=6)
 
-    def test_meta_por_ativo(self):
-        ws = construir(base())["Meta"]
-        self.assertEqual(ws["H5"].value, '=IF(A5="","",META_MENSAL)')
-        self.assertIn("ROUNDUP(H5/F5,0)", ws["I5"].value)
-        self.assertEqual(ws["J5"].value, '=IF(ISNUMBER(I5),I5*D5,"")')
+    def test_meta_padrao_e_personalizada(self):
+        import pandas as pd
+        from invest.dominio import metas
+        b = base()
+        pers = pd.DataFrame({"ticker": ["BBBB11"], "meta_mensal": [500.0], "prazo_meses": [24.0]})
+        b.metas = metas.resolver(b.ativos, pers, {"meta_mensal_por_ativo": 1099, "prazo_meta_meses": 60})
+        ws = construir(b)["Meta"]
+        self.assertEqual(ws["G5"].value, '=IF(A5="","",META_MENSAL)')        # AAAA3: padrão (fórmula)
+        self.assertEqual((ws["G6"].value, ws["H6"].value), (500.0, 24))        # BBBB11: personalizada
+        self.assertIn("ROUNDUP(G5/E5,0)", ws["I5"].value)
+        self.assertIn("(1+F5)^H5", ws["T5"].value)
+        self.assertEqual(construir(b)["Carteira"]["W5"].value, "=IF(N(Meta!G5)>0,MIN(1,V5/Meta!G5),0)")
 
     def test_sem_historico_gera_mesmo_assim(self):
         wb = construir(base(com_historico=False))

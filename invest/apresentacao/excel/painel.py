@@ -373,7 +373,7 @@ def base_graficos(wb, N, D0, sub):
 
 # ------------------------------------------------------------------ painel
 
-def painel(wb, cfg, N, D0, T, sub, classes):
+def painel(wb, N, D0, T, sub, classes):
     wsB, rk = base_graficos(wb, N, D0, sub)
     AL = T - 1
     ws = wb.create_sheet("Painel", 0)
@@ -447,14 +447,13 @@ def painel(wb, cfg, N, D0, T, sub, classes):
     _grafico(ws, barras(wsB, prov_v, wsB, prov_t, D0, AL, "Proventos por ativo (R$)", K, AZUL_S), f"{a3}28", 28, 42)
 
     # meta de renda
-    meta = f"R$ {cfg['meta_mensal_por_ativo']:,.0f}".replace(",", ".")
-    secao(ws, 44, "Meta de renda", f"cada ativo deve pagar {meta}/mês")
-    n_ativos = f'COUNTIF({C}!A{D0}:A{AL},"?*")'
+    secao(ws, 44, "Meta de renda", "meta e prazo de cada ativo: aba Meta (padrão nas Premissas)")
     r = 45
     kpi(ws, r, cols[0], "RENDA MENSAL", f"={C}!V{T}", BRL0, f"={C}!V{T}*12", '"R$ "#,##0" por ano"')
-    kpi(ws, r, cols[1], "META MENSAL", f"=META_MENSAL*{n_ativos}", BRL0, "=META_MENSAL", '"R$ "#,##0" por ativo"', SUAVE)
+    meta_total = f"SUM(Meta!G{D0}:G{AL})"
+    kpi(ws, r, cols[1], "META MENSAL", f"={meta_total}", BRL0, f"=Meta!S{T}", '"Aporte no prazo R$ "#,##0"/mês"', SUAVE)
     kpi(ws, r, cols[2], "PROGRESSO DA META", f"={C}!W{T}", PCT,
-        f"=IF(META_MENSAL>0,{C}!V{T}/(META_MENSAL*{n_ativos}),0)", '0.0%" da renda total"', SUAVE)
+        f"=IF({meta_total}>0,{C}!V{T}/{meta_total},0)", '0.0%" da renda total"', SUAVE)
     kpi(ws, r, cols[3], "ATIVOS NA META", f"={C}!X{T}", None, f"={C}!Y{T}", '#,##0" cotas faltantes"', SUAVE)
     kpi(ws, r, cols[4], "APORTE P/ META", f"={C}!Z{T}", BRL0, "=APORTE_MENSAL", '"Aporte de R$ "#,##0"/mês"', LARANJA_S)
     kpi(ws, r, cols[5], "TEMPO ATÉ A META", f"={C}!AA{T}", MESES,

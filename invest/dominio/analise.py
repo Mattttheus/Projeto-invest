@@ -127,9 +127,10 @@ def metricas_ativo(p, d, ibov_r, c, hoje):
     return m
 
 
-def analisar(ativos, lanc, prov, cfg, hist, hoje=None):
+def analisar(ativos, lanc, prov, cfg, hist, hoje=None, metas=None):
     """Retorna dict com: por_ativo (DataFrame por ticker), carteira (dict), correlacao (DataFrame),
-    projecao (parâmetros), modelos e avisos [Aviso]. hoje: data de referência (padrão: hoje)."""
+    projecao (parâmetros), modelos e avisos [Aviso]. hoje: data de referência (padrão: hoje).
+    metas: meta mensal efetiva por ativo (dominio/metas.resolver); sem ela, a meta padrão para todos."""
     hoje = pd.Timestamp(hoje or pd.Timestamp.today()).normalize()
     c = parametros(cfg)
     avisos = []
@@ -218,13 +219,14 @@ def analisar(ativos, lanc, prov, cfg, hist, hoje=None):
 
     todos = [t for t in ativos["ticker"] if t in R]
     corr = R[todos].corr(min_periods=MIN_SEMANAS_PAR)
-    mod = _modelos(R[todos], por_ativo, w, carteira, projecao, ativos, cfg, c) if len(todos) >= 2 else None
+    meta_total = float(metas["meta_mensal"].sum()) if metas is not None else cfg.get("meta_mensal_por_ativo", 0) * len(ativos)
+    mod = _modelos(R[todos], por_ativo, w, carteira, projecao, ativos, cfg, c, meta_total) if len(todos) >= 2 else None
     return {"vazio": False, "por_ativo": por_ativo, "carteira": carteira, "correlacao": corr,
             "projecao": projecao, "modelos": mod, "avisos": avisos, "cfg": c,
             "data_base": hist["data"].max()}
 
 
-def _modelos(R, por_ativo, w, carteira, projecao, ativos, cfg, c):
+def _modelos(R, por_ativo, w, carteira, projecao, ativos, cfg, c, meta):
     """Álgebra linear (fatores, Markowitz), economia (Fisher) e Monte Carlo sobre a carteira."""
     cov = R.cov(min_periods=MIN_SEMANAS_PAR).fillna(0) * ANO
     # retorno esperado: metade histórico, metade CAPM (encolhimento reduz o erro de estimação de μ)
@@ -240,7 +242,6 @@ def _modelos(R, por_ativo, w, carteira, projecao, ativos, cfg, c):
     carteiras = {k: v for k, v in carteiras.items() if v is not None and v.sum() > 0}
     metricas = {k: modelos.risco_retorno(v, cov, mu, rf) for k, v in carteiras.items()}
 
-    meta = cfg.get("meta_mensal_por_ativo", 0) * len(ativos)
     mu_mc = projecao["g_base"] + (projecao["dy"] if c["reinvestir"] else 0)
     mc = modelos.monte_carlo(carteira.get("valor_rv", 0), cfg.get("aporte_mensal", 0), mu_mc,
                              carteira.get("vol", 0.2), c["horizonte"], meta, projecao["dy"], rf, n=c["simulacoes"])

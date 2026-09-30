@@ -19,10 +19,11 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True     # sem pastas __pycache__ no projeto
 
-from invest.aplicacao.importacao import importar
+from invest.aplicacao.importacao import atualizar_metas, importar
 from invest.aplicacao.pipeline import atualizar_mercado, conferir_e_analisar
 from invest.apresentacao import excel
 from invest.apresentacao.excel.cadastro import ler_formulario_preenchido, para_formulario
+from invest.apresentacao.excel.meta import ler_metas_preenchidas
 from invest.config import caminho_saida, ler_config
 from invest.dominio.avisos import tem_erro
 
@@ -73,6 +74,14 @@ def importar_cadastro(planilha):
     return resumo, para_formulario(pend_compras, pend_proventos)
 
 
+def importar_metas(planilha):
+    """Metas e prazos digitados na aba Meta -> dados/metas.csv. Planilha sem a aba nova: nada muda."""
+    entradas = ler_metas_preenchidas(planilha)
+    if not entradas:
+        return "aba Meta sem campos editáveis — metas mantidas"
+    return atualizar_metas(entradas)[0]
+
+
 def atualizar_online(cfg):
     try:
         atualizar_mercado(cfg)
@@ -110,6 +119,7 @@ def main():
     print("1. Importando a aba Cadastro...")
     resumo, pendentes = importar_cadastro(anterior)
     print(f"  {resumo}")
+    print(f"  metas: {importar_metas(anterior)}")
     if not a.offline:
         print("2. Atualizando cotações, proventos e histórico (Yahoo Finance)...")
         atualizar_online(cfg)

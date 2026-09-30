@@ -72,10 +72,15 @@ Menu no topo: Painel · Carteira · Análises · Meta · Quant · Modelos · Pro
   tendência sem confiabilidade estatística, ativo que concentra o risco).
 
 ## Meta de renda por ativo (aba Meta)
-Cada ação e cada FII deve pagar a meta mensal (`meta_mensal_por_ativo` em `dados/config.json`, hoje R$ 1.099).
-Por ativo: provento mensal por cota, **cotas necessárias** (meta ÷ provento mensal por cota), **custo total da meta**
-(cotas × cotação), cotas que você tem, renda atual, % da meta, **cotas faltantes**, **custo faltante** e meses com
-o aporte mensal. Total da carteira e subtotais de ações e de FIIs. Tudo por fórmula: muda sozinho com as cotações.
+Você decide, para cada ação e cada FII, **quanto quer receber por mês** e **em quantos meses** (campos amarelos).
+Padrão para todos em `dados/config.json` (`meta_mensal_por_ativo`: R$ 1.099, `prazo_meta_meses`: 60) ou na aba
+Premissas. Para personalizar, digite por cima do campo amarelo (fica em negrito); apague para voltar ao padrão.
+As personalizações são salvas em `dados/metas.csv` ao clicar em **⟳ Atualizar** (ou rodar `atualizar.bat`).
+
+Por ativo a aba calcula: valor da cota, provento mensal por cota, **cotas necessárias**, **valor total a investir**,
+cotas que você tem, preço médio e valor investido hoje, renda atual, % da meta, **cotas faltantes**, **valor faltante**,
+**cotas por mês** e **aporte mensal** para cumprir o prazo (também reinvestindo os proventos) e a data prevista.
+No rodapé: aporte que todos os prazos exigem × aporte mensal disponível (sobra ou falta) e subtotais de ações e FIIs.
 
 ## Análise quantitativa (abas Quant, Modelos e Projeção)
 Calculada a cada execução a partir de `dados/historico.csv` e dos seus lançamentos. Os pesos usados são os da

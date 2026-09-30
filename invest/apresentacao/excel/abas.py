@@ -10,6 +10,7 @@ from openpyxl.utils import get_column_letter as L
 from openpyxl.workbook.defined_name import DefinedName
 
 from ...dominio.avisos import AVISO, ERRO, INFO
+from ...dominio.metas import padroes
 from .estilo import (MODO, AMBAR, CINZA_TXT, BRL, BRL0, BRL4, DATE, F, MESES, PCT, QTD, TEAL, VERDE, VERMELHO,
                      cabecalho, cel, f_bold, f_input, f_link, f_norm, f_sub, faixa, fill_head2,
                      fill_input, fill_total, fill_zebra, larguras, linha_total, notas, nulo, tabela)
@@ -93,12 +94,16 @@ def aba_proventos(wb, prov):
 
 
 def aba_premissas(wb, cfg):
-    """Parâmetros de config.json num só lugar, expostos como nomes (META_MENSAL, APORTE_MENSAL, PESO_RV)."""
+    """Parâmetros de config.json num só lugar, expostos como nomes (META_MENSAL, PRAZO_META, APORTE_MENSAL, PESO_RV)."""
     ws = wb.create_sheet("Premissas")
     n = 3
     faixa(ws, "Premissas", ORIGEM.format("config.json"), n)
     cabecalho(ws, H, ["Parâmetro", "Valor", "Uso"])
-    params = [("META_MENSAL", "Meta mensal por ativo", cfg["meta_mensal_por_ativo"], BRL0, "Renda que cada ativo deve pagar por mês"),
+    meta_padrao, prazo_padrao = padroes(cfg)
+    params = [("META_MENSAL", "Meta mensal padrão por ativo", meta_padrao, BRL0,
+               "Renda que cada ativo deve pagar por mês (personalize por ativo na aba Meta)"),
+              ("PRAZO_META", "Prazo padrão da meta (meses)", prazo_padrao, '0" meses"',
+               "Em quanto tempo cada ativo deve atingir a meta (personalize na aba Meta)"),
               ("APORTE_MENSAL", "Aporte mensal", cfg["aporte_mensal"], BRL0, "Quanto você investe por mês (tempo até a meta)"),
               ("PESO_RV", "Peso ideal da renda variável", cfg["peso_ideal_renda_variavel"], PCT, "Ações + FIIs no patrimônio total")]
     for k, (nome, rot, v, fmt, uso) in enumerate(params):
@@ -157,8 +162,8 @@ def aba_carteira(wb, N, T, LN, PN):
             16: f"=IF($G${T}>0,G{r}/$G${T},0)", 17: f"=N(Ativos!F{r})", 18: f"=P{r}-Q{r}",
             19: f"=MAX(0,Q{r}*$G${T}-G{r})",
             20: f"=N(Ativos!E{r})", 21: f"=T{r}/12", 22: f"=C{r}*U{r}",
-            23: f"=IF(META_MENSAL>0,MIN(1,V{r}/META_MENSAL),0)",
-            24: f"=IF(U{r}>0,ROUNDUP(META_MENSAL/U{r},0),0)", 25: f"=MAX(0,X{r}-C{r})",
+            23: f"=IF(N(Meta!G{r})>0,MIN(1,V{r}/Meta!G{r}),0)",
+            24: f"=IF(U{r}>0,ROUNDUP(N(Meta!G{r})/U{r},0),0)", 25: f"=MAX(0,X{r}-C{r})",
             26: f"=Y{r}*F{r}", 27: f"=IF(APORTE_MENSAL>0,ROUNDUP(Z{r}/APORTE_MENSAL,0),0)",
             28: f'=IF(Ativos!C{r}="","",Ativos!C{r})',
             # 1 = entra nos gráficos do dashboard conforme o filtro Tipo (Todos / AÇÃO / FII) do Painel

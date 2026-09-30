@@ -182,8 +182,8 @@ def aba_projecao(wb, analise, T):
         ("PJ_G_BASE", "Valorização anual — base", p["g_base"], PCT, "Tendência 3a × R² (limitada a −10%…+20%)", True),
         ("PJ_G_OTIM", "Valorização anual — otimista", p["g_otim"], PCT, "Base + 1 desvio-padrão no horizonte", True),
         ("PJ_CDI", "CDI anual (comparação)", p["cdi"], PCT, "config.json → analise.cdi_anual", True),
-        ("PJ_META", "Meta de renda mensal total", f'=META_MENSAL*COUNTIF(Carteira!A{D0}:A{T - 1},"?*")', BRL0,
-         "Meta por ativo × nº de ativos", False),
+        ("PJ_META", "Meta de renda mensal total", f"=SUM(Meta!G{D0}:G{T - 1})", BRL0,
+         "Soma das metas de cada ativo (aba Meta)", False),
     ]
     for k, (nome, rot, v, fmt, origem, entrada) in enumerate(params):
         r = D0 + k

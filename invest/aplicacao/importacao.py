@@ -5,6 +5,7 @@ O que não passar volta com a observação do erro, para reaparecer no formulár
 """
 import datetime as dt
 
+from ..dominio import metas as regras_metas
 from ..dominio.carteira import sinal
 from ..dominio.lancamentos import validar_lancamento, validar_provento
 from ..infra import repositorio
@@ -58,3 +59,20 @@ def _resumo(lanc_ok, prov_ok, novos, erros):
     if erros:
         partes.append(f"{len(erros)} com erro: " + " | ".join(f"{d.get('Ticker') or '?'} — {d['Observação']}" for d in erros))
     return "importado: " + " • ".join(partes)
+
+
+def atualizar_metas(entradas):
+    """entradas: [(ticker, meta digitada, prazo digitado)] lidas da aba Meta. Grava em metas.csv só os
+    personalizados; vazio ou fórmula = padrão. Retorna (resumo, erros)."""
+    salvas, erros = [], []
+    for ticker, meta, prazo in entradas:
+        try:
+            m = regras_metas.entrada(ticker, meta, prazo)
+        except (ValueError, TypeError) as e:
+            erros.append(str(e))
+            continue
+        if m["meta_mensal"] is not None or m["prazo_meses"] is not None:
+            salvas.append(m)
+    repositorio.salvar_metas(salvas)
+    resumo = f"{len(salvas)} meta(s) personalizada(s)" + (f" • com erro: {'; '.join(erros)}" if erros else "")
+    return resumo, erros

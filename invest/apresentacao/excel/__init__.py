@@ -44,9 +44,9 @@ def _construir(base, pendentes, google):
     aba_quant(wb, ativos, base.analise, T)
     aba_modelos(wb, base.analise)
     aba_projecao(wb, base.analise, T)
-    aba_meta(wb, N, T)
+    aba_meta(wb, ativos, base.metas, T)
     aba_cadastro(wb, f"Ativos!$A${D0}:$A${T - 1}", N, D0, pendentes)
-    painel(wb, base.cfg, N, D0, T, sub, classes)
+    painel(wb, N, D0, T, sub, classes)
     wb["Ativos"].sheet_state = "hidden"      # base do catálogo; a lista visível é uma só: Carteira
 
     ordem = {nome: i for i, nome in enumerate(ABAS + ["Base Painel"])}
