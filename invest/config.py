@@ -1,9 +1,13 @@
-"""Caminhos do projeto e leitura de dados/config.json (premissas do usuário)."""
+"""Caminhos do projeto e leitura de dados/config.json (premissas do usuário).
+
+INVEST_DADOS (variável de ambiente) troca a pasta de entrada — usado pela demonstração (demo/dados).
+"""
 import json
+import os
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
-DADOS = BASE / "dados"          # entrada — única fonte de informação
+DADOS = Path(os.environ.get("INVEST_DADOS") or BASE / "dados")   # entrada — única fonte de informação
 SAIDA = BASE / "saida"          # planilha gerada
 ARQUIVO_SAIDA_PADRAO = "Gestao de investimentos.xlsm"
 

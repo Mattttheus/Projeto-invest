@@ -32,9 +32,12 @@ invest/         código em camadas (Clean Architecture: cada camada só depende 
   apresentacao/     saídas
     excel/            abas, painel, formulário do Cadastro, análises, tabelas dinâmicas, macros (VBA), estilo
     google.py         versão Google Planilhas (GOOGLEFINANCE, QUERY, Apps Script)
+    web/              página web (dados.json + estatico/: HTML, JS, CSS, api.php)
 tests/          testes automáticos (python -m unittest discover -s tests -t .)
 arquivo/        planilha antiga e dados simulados antigos (backup)
 gestao.py       comando único (raiz de composição: único arquivo que liga as camadas)
+web/            AUTOMÁTICO (fora do Git): página web com seus dados, servida pelo WAMP na porta 8081
+demo/           dados simulados + gerar_demo.py → docs/ (demonstração no GitHub Pages)
 atualizar.bat   duplo clique = atualizar tudo
 ```
 
@@ -102,8 +105,29 @@ Calculada a cada execução a partir de `dados/historico.csv` e dos seus lançam
   `reinvestir_proventos`, `historico_anos`, `lambda_ewma`, `simulacoes_monte_carlo`.
 - Estimativas estatísticas a partir do passado — não são recomendação nem garantia de retorno.
 
+## Página web (WAMP na rede local e GitHub Pages)
+As mesmas abas da planilha no navegador: Painel (com filtros e gráficos), Carteira, Meta (editável), Quant,
+Modelos (Markowitz, fatores, Monte Carlo), Projeção (parâmetros editáveis), ✚ Lançar, Lançamentos, Proventos,
+Premissas e Verificar. O Python exporta `dados.json`; a página recalcula Carteira, Meta e Projeção com as mesmas fórmulas.
+
+**No WAMP (seus dados reais, só na sua rede):**
+1. `python gestao.py --web` (ou `--web-atualizar --offline` para gerar só a página) → pasta `web/` (fora do Git).
+2. Apache: bloco `<VirtualHost *:8081>` em `bin/apache/apache2.4.54.2/conf/extra/httpd-vhosts.conf`
+   (backup em `httpd-vhosts.conf.bak-antes-invest`) — `Require local` + `Require ip 192.168.1`. Reinicie pelo ícone do WAMP.
+3. Rede: `liberar_rede.bat` como administrador abre a porta 8081 só para 192.168.1.x.
+4. Acesse `http://localhost:8081` neste PC ou `http://<IP fixo>:8081` de outro aparelho da rede.
+   IP fixo: reserve o IP no roteador (DHCP por MAC) ou configure IPv4 manual no adaptador Wi-Fi/Ethernet.
+- ✚ Lançar, metas e ⟳ Atualizar cotações chamam `web/api.php` → `gestao.py --web-registrar/--web-atualizar`,
+  com as mesmas regras do Cadastro. A planilha não é regerada por aí (pode estar aberta): rode `atualizar.bat` depois.
+
+**No GitHub Pages (demonstração pública com dados simulados):**
+1. `python demo/gerar_demo.py` → `docs/` a partir de `demo/dados/` (lançamentos e proventos fictícios; cotações reais).
+2. No GitHub: Settings › Pages › Deploy from a branch › `main` / `/docs`.
+- Modo demo: nada é gravado no servidor; edições ficam no navegador (botão "Restaurar dados da demo").
+- Nunca aponte `gerar_demo.py` para `dados/`: o repositório é público.
+
 ## Privacidade
-- `.htaccess` impede o Apache/WAMP de servir esta pasta (ela fica dentro de `www`).
+- `.htaccess` impede o Apache/WAMP de servir esta pasta (ela fica dentro de `www`); só `web/` é servida, na porta 8081 e para a rede local.
 - Só os tickers são enviados ao Yahoo Finance.
 
 ## Google Planilhas / Google Drive

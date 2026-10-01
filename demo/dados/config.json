@@ -1,0 +1,33 @@
+{
+  "meta_mensal_por_ativo": 300,
+  "prazo_meta_meses": 60,
+  "aporte_mensal": 3000,
+  "peso_ideal_renda_variavel": 0.32,
+  "outras_classes": [
+    {
+      "classe": "Renda fixa (CDB)",
+      "valor": 45000,
+      "peso_ideal": 0.5
+    },
+    {
+      "classe": "Internacional",
+      "valor": 12000,
+      "peso_ideal": 0.15
+    },
+    {
+      "classe": "Cripto",
+      "valor": 2500,
+      "peso_ideal": 0.03
+    }
+  ],
+  "arquivo_saida": "Gestao de investimentos.xlsm",
+  "analise": {
+    "cdi_anual": 0.14,
+    "horizonte_anos": 10,
+    "reinvestir_proventos": true,
+    "historico_anos": 5,
+    "inflacao_anual": 0.045,
+    "lambda_ewma": 0.94,
+    "simulacoes_monte_carlo": 3000
+  }
+}

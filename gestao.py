@@ -1,9 +1,10 @@
-r"""Gestão de investimentos — comando único (raiz de composição: liga as camadas do pacote invest).
+"""Gestão de investimentos — comando único (raiz de composição: liga as camadas do pacote invest).
 
     python gestao.py            importa o Cadastro, atualiza cotações/proventos e gera a planilha
     python gestao.py --offline  gera sem acessar a internet
     python gestao.py --google   também gera a versão Google Planilhas (pasta google/)
     python gestao.py --google --drive   ...e copia para G:\Meu Drive\InvestERP
+    python gestao.py --web      também gera a página web em web/ (WAMP: http://localhost:8081)
 
 Entrada: dados/ (única fonte) + aba Cadastro da planilha.  Saída: saida/Gestao de investimentos.xlsm
 (com macros: botões Registrar, Limpar, Novo lançamento e Atualizar cotações).
@@ -12,6 +13,7 @@ Camadas (invest/): dominio (regras puras) <- infra (arquivos, Yahoo) <- aplicaca
 <- apresentacao (Excel, Google). Só este arquivo conhece todas.
 """
 import argparse
+import json
 import os
 import sys
 import time
@@ -24,10 +26,11 @@ from invest.aplicacao.pipeline import atualizar_mercado, conferir_e_analisar
 from invest.apresentacao import excel
 from invest.apresentacao.excel.cadastro import ler_formulario_preenchido, para_formulario
 from invest.apresentacao.excel.meta import ler_metas_preenchidas
-from invest.config import caminho_saida, ler_config
+from invest.config import BASE, caminho_saida, ler_config
 from invest.dominio.avisos import tem_erro
 
 ESPERA_FECHAR = 60                 # segundos aguardando a planilha ser fechada (botão Atualizar)
+WEB = BASE / "web"                 # página servida pelo WAMP (dados reais: só localhost e rede local)
 
 
 def argumentos():
@@ -40,6 +43,9 @@ def argumentos():
     p.add_argument("--abrir", action="store_true", help="abre a planilha no Excel ao terminar")
     p.add_argument("--google", action="store_true", help="também gera a versão Google Planilhas em google/")
     p.add_argument("--drive", nargs="?", const="padrao", help="copia a versão Google para o Google Drive")
+    p.add_argument("--web", action="store_true", help="também gera a página web em web/")
+    p.add_argument("--web-atualizar", action="store_true", help="atualiza só a página web (usado pelo api.php)")
+    p.add_argument("--web-registrar", metavar="JSON", help="grava lançamentos/proventos/metas vindos da página web")
     return p.parse_args()
 
 
@@ -109,9 +115,50 @@ def gerar_google(base, drive):
         print(f"5. {m}")
 
 
+def gerar_web(base, planilha=None):
+    """Página web em web/ (servida pelo WAMP) + servidor.php: o Python que o api.php deve chamar."""
+    import site
+    from invest.apresentacao import web
+    from invest.infra import historico
+    if planilha is None:
+        saida = caminho_saida(base.cfg)
+        planilha = saida if saida.exists() else saida.with_suffix(".xlsx")
+    for m in web.gerar(base, WEB, "local", historico.carregar(), planilha):
+        print(f"6. {m}")
+    cfg = json.dumps({"python": sys.executable, "raiz": str(BASE), "site_usuario": site.getusersitepackages()})
+    (WEB / "servidor.php").write_text("<?php // gerado por gestao.py --web: Python usado pelo api.php\n"
+                                      f"return json_decode(<<<'JSON'\n{cfg}\nJSON, true);\n", encoding="utf-8")
+
+
+def web_atualizar(a, cfg):
+    """Botão ⟳ da página: cotações (se online) + página. Não mexe na planilha (pode estar aberta no Excel)."""
+    if not a.offline:
+        atualizar_online(cfg)
+    gerar_web(conferir())
+
+
+def web_registrar(arquivo):
+    """Formulários da página web -> mesmas regras do Cadastro da planilha. Responde em JSON (para o api.php)."""
+    pedido = json.loads(Path(arquivo).read_text(encoding="utf-8"))
+    resumo, pend_c, pend_p = importar(pedido.get("lancamentos", []), pedido.get("proventos", []))
+    erros = [d["Observação"] for d in pend_c + pend_p]
+    if pedido.get("metas"):
+        r_metas, e_metas = atualizar_metas(pedido["metas"])
+        resumo, erros = f"{resumo} • {r_metas}", erros + e_metas
+    base = conferir_e_analisar()
+    if not tem_erro(base.avisos):
+        gerar_web(base)
+    return {"ok": not erros, "resumo": resumo, "erros": erros}
+
+
 def main():
     a = argumentos()
     cfg = ler_config()
+    if a.web_registrar:
+        print("@@" + json.dumps(web_registrar(a.web_registrar), ensure_ascii=False))
+        return
+    if a.web_atualizar:
+        return web_atualizar(a, cfg)
     saida = caminho_saida(cfg, a.saida)
     anterior = saida if saida.exists() else saida.with_suffix(".xlsx")   # transição da versão sem macros
     garantir_fechada({saida, anterior}, a.esperar)
@@ -137,6 +184,8 @@ def main():
         anterior.unlink()                                 # versão antiga sem macros (dados já importados)
     if a.google or a.drive:
         gerar_google(base, a.drive)
+    if a.web:
+        gerar_web(base, saida if saida.exists() else saida.with_suffix(".xlsx"))
     if a.abrir and saida.exists():
         os.startfile(saida)
 

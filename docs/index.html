@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gestão de Investimentos</title>
+<meta name="description" content="Carteira de ações e FIIs: painel, meta de renda por ativo, análise quantitativa, Markowitz, Monte Carlo e projeção.">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="topo">
+  <div class="marca">
+    <span class="logo">▲</span>
+    <div>
+      <strong>Gestão de Investimentos</strong>
+      <small id="situacao">carregando…</small>
+    </div>
+  </div>
+  <div class="acoes">
+    <a id="baixar" class="botao fantasma" hidden>⬇ Planilha</a>
+    <button id="atualizar" class="botao fantasma" hidden>⟳ Atualizar cotações</button>
+    <button id="novo" class="botao">✚ Novo lançamento</button>
+  </div>
+</header>
+<div id="faixa-demo" class="faixa-demo" hidden>
+  Demonstração com <strong>dados simulados</strong> — cotações e histórico reais (Yahoo Finance), lançamentos fictícios.
+  Tudo o que você alterar fica só neste navegador. <button id="restaurar" class="link">Restaurar dados da demo</button>
+</div>
+<nav class="menu" id="menu" aria-label="Abas"></nav>
+<main id="conteudo"></main>
+<footer class="rodape">
+  <span id="rodape"></span>
+  <span>Estimativas estatísticas a partir do passado — não são recomendação nem garantia de retorno.</span>
+</footer>
+<div id="aviso-toast" class="toast" role="status" hidden></div>
+<script src="chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
